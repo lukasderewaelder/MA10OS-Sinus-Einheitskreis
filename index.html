@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interaktive Sinusfunktion - Erweiterter Bereich</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --accent: #ef4444; 
+            --grid: #e2e8f0;
+            --bg: #f8fafc;
+            --text: #1e293b;
+            --secondary: #64748b;
+            --wood: #a16207;
+        }
+
+        body {
+            font-family: -apple-system, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: var(--bg);
+            color: var(--text);
+            user-select: none;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 98%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        header { text-align: center; margin-bottom: 5px; flex: 0 0 auto; }
+        h1 { margin: 0; font-size: 1.2rem; color: var(--primary); }
+
+        #canvas-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+            border: 1px solid #e2e8f0;
+            cursor: crosshair;
+            touch-action: none;
+            flex: 1 1 auto;
+            width: 100%;
+            position: relative;
+        }
+
+        .controls {
+            margin-top: 10px;
+            background: white;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 0 0 auto;
+        }
+
+        .info-bar {
+            display: flex;
+            justify-content: space-around;
+            padding: 8px;
+            background: #f1f5f9;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1rem;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            background: var(--primary);
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
+        }
+
+        button:active { transform: scale(0.95); }
+        button.outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
+        button.saw-btn { background: #475569; }
+        button.saw-active { background: var(--wood); color: white; }
+
+        .hidden-controls { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Sinusfunktion: Einheitskreis & Graph (-360° bis 720°)</h1>
+    </header>
+
+    <div id="canvas-container"></div>
+
+    <div class="controls">
+        <div class="info-bar">
+            <span>α = <span id="ui-deg">60</span>°</span>
+            <span>P(<span id="ui-x">0.50</span> | <span id="ui-y">0.87</span>)</span>
+            <span style="color: var(--accent)">sin(α) = <span id="ui-sin">0.866</span></span>
+        </div>
+
+        <div class="btn-group">
+            <button id="btn-play">Fortsetzen</button>
+            <button id="btn-reset" class="outline">Reset Graph</button>
+            <button id="btn-mode" class="outline">Grad / Bogenmaß</button>
+            <button id="btn-saw" class="saw-btn">Sägeblatt-Modus: AUS</button>
+        </div>
+
+        <div class="hidden-controls">
+            <input type="range" id="slider-amp" min="0.1" max="2.0" step="0.1" value="1.0">
+            <input type="range" id="slider-d" min="-100" max="100" value="0">
+        </div>
+    </div>
+</div>
+
+<script>
+    let alpha = 60; 
+    let amplitude = 1.0;
+    let offsetD = 0;
+    let isPlaying = false; 
+    let useRadians = false;
+    let sawMode = false;
+    let isDragging = false;
+    let dragTarget = null;
+    
+    // Historie der besuchten Winkel für das "Abfahren"
+    let visitedRange = { min: 60, max: 60, active: false };
+
+    let circleX, graphStartX, graphWidth, mainRadius;
+
+    function setup() {
+        const container = select('#canvas-container');
+        const cnv = createCanvas(container.width, container.height);
+        cnv.parent('canvas-container');
+        
+        calculateLayout();
+
+        select('#btn-play').mousePressed(togglePlay);
+        select('#btn-mode').mousePressed(() => useRadians = !useRadians);
+        select('#btn-saw').mousePressed(toggleSawMode);
+        select('#btn-reset').mousePressed(resetGraph);
+    }
+
+    function windowResized() {
+        const container = select('#canvas-container');
+        resizeCanvas(container.width, container.height);
+        calculateLayout();
+    }
+
+    function calculateLayout() {
+        circleX = width * 0.20;
+        graphStartX = width * 0.38;
+        graphWidth = width - graphStartX - 40;
+        mainRadius = min(height * 0.32, width * 0.12);
+    }
+
+    function togglePlay() {
+        isPlaying = !isPlaying;
+        visitedRange.active = true;
+        select('#btn-play').html(isPlaying ? "Anhalten" : "Fortsetzen");
+    }
+
+    function resetGraph() {
+        visitedRange.min = alpha;
+        visitedRange.max = alpha;
+        visitedRange.active = false;
+        isPlaying = false;
+        select('#btn-play').html("Fortsetzen");
+    }
+
+    function toggleSawMode() {
+        sawMode = !sawMode;
+        const btn = select('#btn-saw');
+        btn.html(sawMode ? "Sägeblatt-Modus: AN" : "Sägeblatt-Modus: AUS");
+        if (sawMode) {
+            btn.addClass('saw-active');
+            offsetD = mainRadius * 0.2; 
+        } else {
+            btn.removeClass('saw-active');
+            offsetD = 0;
+        }
+    }
+
+    function mousePressed() {
+        let dShift = -offsetD;
+        let r_curr = mainRadius * amplitude;
+        let px = circleX + cos(radians(alpha)) * r_curr;
+        let py = (height/2 + dShift) - sin(radians(alpha)) * r_curr;
+        
+        // Suche im Graphen (-360 bis 720)
+        let gx = graphStartX + map(alpha, -360, 720, 0, graphWidth);
+        let gy = (height/2 + dShift) - sin(radians(alpha)) * r_curr;
+
+        if (dist(mouseX, mouseY, px, py) < 30) {
+            isDragging = true;
+            dragTarget = 'circle';
+            isPlaying = false;
+            visitedRange.active = true;
+        } else if (dist(mouseX, mouseY, gx, gy) < 30) {
+            isDragging = true;
+            dragTarget = 'graph';
+            isPlaying = false;
+            visitedRange.active = true;
+        }
+        
+        if (!isPlaying) select('#btn-play').html("Fortsetzen");
+    }
+
+    function mouseReleased() {
+        isDragging = false;
+        dragTarget = null;
+    }
+
+    function draw() {
+        background(255);
+        let dShift = -offsetD;
+
+        if (isPlaying) {
+            alpha = (alpha + 1.2);
+            if (alpha > 720) alpha = -360; 
+        }
+
+        if (isDragging) {
+            if (dragTarget === 'circle') {
+                let dx = mouseX - circleX;
+                let dy = mouseY - (height/2 + dShift);
+                let angle = degrees(atan2(-dy, dx));
+                // Da wir über 360° hinausgehen können, muss man hier logisch entscheiden.
+                // Wir nehmen den Winkel, der am nächsten am aktuellen alpha liegt.
+                let targetAlpha = angle < 0 ? angle + 360 : angle;
+                // Einfache Heuristik für nahtlosen Übergang beim Ziehen
+                let diff = targetAlpha - (alpha % 360);
+                if (diff > 180) diff -= 360;
+                if (diff < -180) diff += 360;
+                alpha = constrain(alpha + diff, -360, 720);
+            } else if (dragTarget === 'graph') {
+                let mx = constrain(mouseX - graphStartX, 0, graphWidth);
+                alpha = map(mx, 0, graphWidth, -360, 720);
+            }
+        }
+
+        // Tracking der besuchten Winkel
+        if (visitedRange.active) {
+            visitedRange.min = min(visitedRange.min, alpha);
+            visitedRange.max = max(visitedRange.max, alpha);
+        }
+
+        updateUI();
+        drawScene(dShift);
+    }
+
+    function drawScene(dShift) {
+        if (sawMode) {
+            fill(161, 98, 7, 30); noStroke();
+            rect(40, height/2 + dShift, width-80, height - (height/2 + dShift) - 10);
+            stroke(161, 98, 7); strokeWeight(4);
+            line(30, height/2 + dShift, width-30, height/2 + dShift); 
+        } else {
+            stroke(220); strokeWeight(1);
+            line(30, height/2 + dShift, width-30, height/2 + dShift);
+        }
+
+        drawCircleSide(dShift);
+        drawGraphSide(dShift);
+    }
+
+    function drawCircleSide(dShift) {
+        push();
+        translate(circleX, height/2 + dShift);
+        
+        let rad = radians(alpha);
+        let r_curr = mainRadius * amplitude;
+        let px = cos(rad) * r_curr;
+        let py = -sin(rad) * r_curr;
+
+        if (sawMode) {
+            fill(180); stroke(100); strokeWeight(1);
+            push();
+            rotate(-rad); 
+            beginShape();
+            let teeth = 36;
+            for (let i = 0; i < teeth; i++) {
+                let a = map(i, 0, teeth, 0, TWO_PI);
+                vertex(cos(a) * r_curr, sin(a) * r_curr);
+                let ta = a + (TWO_PI / teeth / 2);
+                vertex(cos(ta) * (r_curr + r_curr * 0.08), sin(ta) * (r_curr + r_curr * 0.02));
+            }
+            endShape(CLOSE);
+            noFill(); stroke(150);
+            ellipse(0, 0, r_curr * 1.6); ellipse(0, 0, r_curr * 0.8);
+            pop();
+            fill(100); ellipse(0, 0, 15); 
+        } else {
+            noFill(); stroke(220);
+            ellipse(0, 0, r_curr * 2);
+            line(-r_curr-20, 0, r_curr+20, 0); line(0, -r_curr-20, 0, r_curr+20);
+            fill(150); noStroke(); textSize(12);
+            text("1", r_curr + 5, 15); text("-1", -r_curr - 18, 15);
+        }
+
+        strokeWeight(1); stroke(180);
+        line(0, 0, px, 0); 
+        if (!sawMode && abs(px) > 25) {
+            fill(150); noStroke(); textAlign(CENTER); text("cos(α)", px/2, 15);
+        }
+
+        stroke(varColor('--accent')); strokeWeight(4);
+        line(px, 0, px, py); 
+        fill(varColor('--accent')); noStroke(); textAlign(LEFT); textStyle(BOLD);
+        if (abs(py) > 15) text(" sin(α)", px + 5, py/2);
+
+        stroke(0); strokeWeight(1); line(0, 0, px, py);
+        fill(0); noStroke(); textStyle(NORMAL); textAlign(CENTER, CENTER);
+        text("1", px/2 - 12, py/2 - 12);
+
+        noFill(); stroke(varColor('--primary')); strokeWeight(2);
+        arc(0, 0, 50, 50, -rad, 0);
+        fill(varColor('--primary')); noStroke();
+        text("α", 35 * cos(-rad/2), 35 * sin(-rad/2));
+
+        fill(0); stroke(255); strokeWeight(2);
+        ellipse(px, py, 12);
+        noStroke(); fill(0); textStyle(BOLD);
+        text(`P(${ (px/mainRadius).toFixed(2) } | ${ (-py/mainRadius).toFixed(2) })`, px - 35, py - 18);
+        pop();
+    }
+
+    function drawGraphSide(dShift) {
+        push();
+        translate(graphStartX, height/2 + dShift);
+        
+        // Hilfslinien bei 1 und -1
+        stroke(240); strokeWeight(1);
+        line(0, -mainRadius, graphWidth, -mainRadius);
+        line(0, mainRadius, graphWidth, mainRadius);
+
+        // Y-Achse
+        stroke(180);
+        line(0, -mainRadius * 1.3, 0, mainRadius * 1.3); 
+        fill(120); noStroke(); textAlign(RIGHT, CENTER); textSize(11);
+        text("1", -8, -mainRadius); text("-1", -8, mainRadius);
+
+        // X-Achse
+        stroke(180);
+        line(0, 0, graphWidth + 10, 0);
+        
+        // Vertikale Gitterlinien und X-Skala
+        textAlign(CENTER, TOP);
+        for(let i = -360; i <= 720; i += 90) {
+            let x = map(i, -360, 720, 0, graphWidth);
+            stroke(245); strokeWeight(1);
+            line(x, -mainRadius * 1.2, x, mainRadius * 1.2); // Vertikales Gitter
+            
+            stroke(200);
+            line(x, -5, x, 5); // Ticks
+            
+            noStroke(); fill(120);
+            if (useRadians) {
+                let labels = ["-2π", "-3/2π", "-π", "-π/2", "0", "π/2", "π", "3/2π", "2π", "5/2π", "3π", "7/2π", "4π"];
+                let idx = (i + 360) / 90;
+                text(labels[idx], x, 22);
+            } else {
+                text(i + "°", x, 22);
+            }
+        }
+
+        // Wellenform (nur abgefahrener Bereich)
+        if (visitedRange.active) {
+            noFill(); stroke(varColor('--accent')); strokeWeight(3);
+            beginShape();
+            for (let a = visitedRange.min; a <= visitedRange.max; a += 2) {
+                let x = map(a, -360, 720, 0, graphWidth);
+                let y = -sin(radians(a)) * mainRadius * amplitude;
+                vertex(x, y);
+            }
+            endShape();
+        }
+
+        // Aktueller Punkt im Graph
+        let gx = map(alpha, -360, 720, 0, graphWidth);
+        let gy = -sin(radians(alpha)) * mainRadius * amplitude;
+        fill(varColor('--accent')); stroke(255); strokeWeight(2);
+        ellipse(gx, gy, 12);
+        
+        // Verbindungslinie
+        stroke(220); strokeWeight(1);
+        drawingContext.setLineDash([5, 5]);
+        let pxLocal = cos(radians(alpha)) * mainRadius * amplitude;
+        line(pxLocal - (graphStartX - circleX), gy, gx, gy);
+        drawingContext.setLineDash([]);
+        pop();
+    }
+
+    function updateUI() {
+        let s = sin(radians(alpha));
+        let c = cos(radians(alpha));
+        select('#ui-deg').html(floor(alpha));
+        select('#ui-x').html(c.toFixed(2));
+        select('#ui-y').html(s.toFixed(2));
+        select('#ui-sin').html(s.toFixed(3));
+    }
+
+    function varColor(name) {
+        return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+</script>
+
+</body>
+</html>
