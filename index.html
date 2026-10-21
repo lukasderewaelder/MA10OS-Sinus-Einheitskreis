@@ -3,78 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interaktive Sinusfunktion - Erweiterter Bereich</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+    <title>Sinusfunktion am Einheitskreis</title>
+    <script src="p5.min.js"></script>
     <style>
         :root {
             --primary: #2563eb;
-            --accent: #ef4444; 
+            --accent: #dc2626;
             --grid: #e2e8f0;
             --bg: #f8fafc;
             --text: #1e293b;
-            --secondary: #64748b;
+            --secondary: #475569;
             --wood: #a16207;
+            --focus: #f59e0b;
         }
 
+        * { box-sizing: border-box; }
+
+        html, body { margin: 0; height: 100%; }
+
         body {
-            font-family: -apple-system, sans-serif;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
             background-color: var(--bg);
             color: var(--text);
             user-select: none;
-            width: 100vw;
-            height: 100vh;
+            -webkit-user-select: none;
             overflow: hidden;
         }
 
         .container {
-            width: 98%;
-            height: 100%;
+            width: 100%;
+            height: 100vh;
+            height: 100dvh;
+            max-width: 2400px;
+            margin: 0 auto;
             display: flex;
             flex-direction: column;
+            gap: 8px;
             padding: 10px;
-            box-sizing: border-box;
+            overflow-y: auto;
         }
 
-        header { text-align: center; margin-bottom: 5px; flex: 0 0 auto; }
-        h1 { margin: 0; font-size: 1.2rem; color: var(--primary); }
+        header { text-align: center; flex: 0 0 auto; }
+        h1 { margin: 0; font-size: clamp(1.1rem, 2.2vw, 2rem); color: var(--primary); }
+        .hint { margin: 2px 0 0; font-size: clamp(0.8rem, 1.1vw, 1.1rem); color: var(--secondary); }
 
         #canvas-container {
             background: white;
             border-radius: 12px;
             box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--grid);
             cursor: crosshair;
             touch-action: none;
-            flex: 1 1 auto;
+            flex: 1 1 0;
+            min-height: 260px;
             width: 100%;
             position: relative;
+            overflow: hidden;
         }
+        #canvas-container canvas { display: block; }
 
         .controls {
-            margin-top: 10px;
             background: white;
             padding: 12px;
             border-radius: 12px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--grid);
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 10px;
             flex: 0 0 auto;
         }
 
         .info-bar {
             display: flex;
             justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 4px 16px;
             padding: 8px;
             background: #f1f5f9;
             border-radius: 8px;
-            font-weight: bold;
-            font-size: 1rem;
+            font-size: clamp(1rem, 1.9vw, 1.9rem);
+        }
+        .info-bar .sin { color: var(--accent); font-weight: 700; }
+        .info-bar b { font-variant-numeric: tabular-nums; }
+
+        .term {
+            text-align: center;
+            font-size: clamp(1rem, 1.7vw, 1.7rem);
+            font-family: Georgia, "Times New Roman", serif;
+            color: var(--text);
         }
 
         .btn-group {
@@ -85,99 +101,287 @@
         }
 
         button {
+            min-height: 44px;
             padding: 8px 16px;
             border-radius: 6px;
-            border: none;
+            border: 2px solid var(--primary);
             background: var(--primary);
             color: white;
+            font-size: clamp(0.95rem, 1.3vw, 1.3rem);
             font-weight: 600;
             cursor: pointer;
             transition: transform 0.1s, background 0.2s;
         }
-
         button:active { transform: scale(0.95); }
-        button.outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
-        button.saw-btn { background: #475569; }
-        button.saw-active { background: var(--wood); color: white; }
+        button.outline { background: transparent; color: var(--primary); }
+        button.saw-btn { background: #475569; border-color: #475569; }
+        button.saw-active { background: var(--wood); border-color: var(--wood); color: white; }
 
-        .hidden-controls { display: none; }
+        :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+        .params {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 6px 18px;
+            padding-top: 8px;
+            border-top: 1px solid var(--grid);
+        }
+        .param label {
+            display: flex;
+            justify-content: space-between;
+            font-weight: 600;
+            font-size: clamp(0.9rem, 1.2vw, 1.2rem);
+        }
+        .param output { font-variant-numeric: tabular-nums; color: var(--primary); }
+        .param input[type=range] { width: 100%; height: 32px; margin: 0; accent-color: var(--primary); }
+
+        .sr-only {
+            position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+            overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+        }
+
+        @media (max-width: 700px) {
+            #canvas-container { min-height: 420px; }
+            .hint { display: none; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            button { transition: none; }
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
     <header>
-        <h1>Sinusfunktion: Einheitskreis & Graph (-360° bis 720°)</h1>
+        <h1>Sinusfunktion: Einheitskreis &amp; Graph (−360° bis 720°)</h1>
+        <p class="hint">Punkt ziehen · Pfeiltasten ←/→ ändern α (Shift: 15°) · Leertaste: Start/Stopp</p>
     </header>
 
-    <div id="canvas-container"></div>
+    <div id="canvas-container" tabindex="0" role="application"
+         aria-label="Interaktiver Einheitskreis mit Sinusgraph. Mit den Pfeiltasten links und rechts ändern Sie den Winkel, mit der Leertaste starten oder stoppen Sie die Animation."></div>
 
     <div class="controls">
         <div class="info-bar">
-            <span>α = <span id="ui-deg">60</span>°</span>
-            <span>P(<span id="ui-x">0.50</span> | <span id="ui-y">0.87</span>)</span>
-            <span style="color: var(--accent)">sin(α) = <span id="ui-sin">0.866</span></span>
+            <span>α = <b id="ui-alpha">60°</b></span>
+            <span>P(<b id="ui-x">0,50</b> | <b id="ui-y">0,87</b>)</span>
+            <span class="sin">sin(α) = <b id="ui-sin">0,866</b><b id="ui-exact"></b></span>
+            <span id="ui-f-wrap" hidden>f(α) = <b id="ui-f">0,00</b></span>
         </div>
+
+        <div class="term" id="ui-term" aria-label="Funktionsterm">y = sin(x)</div>
 
         <div class="btn-group">
             <button id="btn-play">Fortsetzen</button>
             <button id="btn-reset" class="outline">Reset Graph</button>
-            <button id="btn-mode" class="outline">Grad / Bogenmaß</button>
-            <button id="btn-saw" class="saw-btn">Sägeblatt-Modus: AUS</button>
+            <button id="btn-mode" class="outline" aria-pressed="false">Grad / Bogenmaß</button>
+            <button id="btn-snap" class="outline" aria-pressed="true">Einrasten: AN</button>
+            <button id="btn-saw" class="saw-btn" aria-pressed="false">Sägeblatt-Modus: AUS</button>
         </div>
 
-        <div class="hidden-controls">
-            <input type="range" id="slider-amp" min="0.1" max="2.0" step="0.1" value="1.0">
-            <input type="range" id="slider-d" min="-100" max="100" value="0">
+        <div class="params">
+            <div class="param">
+                <label for="slider-a">a (Amplitude) <output id="out-a" for="slider-a">1</output></label>
+                <input type="range" id="slider-a" min="0.5" max="2" step="0.1" value="1">
+            </div>
+            <div class="param">
+                <label for="slider-b">b (Frequenz) <output id="out-b" for="slider-b">1</output></label>
+                <input type="range" id="slider-b" min="0.5" max="4" step="0.5" value="1">
+            </div>
+            <div class="param">
+                <label for="slider-c">c (Verschiebung in x) <output id="out-c" for="slider-c">0°</output></label>
+                <input type="range" id="slider-c" min="-180" max="180" step="15" value="0">
+            </div>
+            <div class="param">
+                <label for="slider-d">d (Verschiebung in y) <output id="out-d" for="slider-d">0</output></label>
+                <input type="range" id="slider-d" min="-1.5" max="1.5" step="0.1" value="0">
+            </div>
+            <div class="param" style="align-self:end">
+                <button id="btn-params-reset" class="outline" style="width:100%">Parameter zurücksetzen</button>
+            </div>
         </div>
     </div>
+    <div id="sr-status" class="sr-only" role="status" aria-live="polite"></div>
 </div>
 
 <script>
-    let alpha = 60; 
-    let amplitude = 1.0;
-    let offsetD = 0;
-    let isPlaying = false; 
+    const ALPHA_MIN = -360;
+    const ALPHA_MAX = 720;
+    const SNAP_TOL = 3;
+    const PLAY_STEP = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0.4 : 1.2;
+    const EXACT = { 0: '0', 30: '1/2', 45: '√2/2', 60: '√3/2', 90: '1' };
+    const CIRCLE_SPECIALS = [];
+    for (let d = 0; d < 360; d += 15) {
+        if (d % 30 === 0 || d % 45 === 0) CIRCLE_SPECIALS.push(d);
+    }
+
+    let alpha = 60;
+    let params = { a: 1, b: 1, c: 0, d: 0 };
+    let isPlaying = false;
     let useRadians = false;
     let sawMode = false;
+    let snapOn = true;
     let isDragging = false;
     let dragTarget = null;
-    
+
     // Historie der besuchten Winkel für das "Abfahren"
     let visitedRange = { min: 60, max: 60, active: false };
 
-    let circleX, graphStartX, graphWidth, mainRadius;
+    let L = {};            // Layout
+    let ptr = { x: 0, y: 0 };
+    let host;              // #canvas-container
+    let colAccent, colPrimary;
+    let announceTimer = null;
+
+    const $ = id => document.getElementById(id);
+
+    // ---------- Setup ----------
 
     function setup() {
-        const container = select('#canvas-container');
-        const cnv = createCanvas(container.width, container.height);
+        host = $('canvas-container');
+        const cnv = createCanvas(host.clientWidth, host.clientHeight);
         cnv.parent('canvas-container');
-        
+        cnv.elt.setAttribute('aria-hidden', 'true');
+
+        colAccent = varColor('--accent');
+        colPrimary = varColor('--primary');
+
         calculateLayout();
 
-        select('#btn-play').mousePressed(togglePlay);
-        select('#btn-mode').mousePressed(() => useRadians = !useRadians);
-        select('#btn-saw').mousePressed(toggleSawMode);
-        select('#btn-reset').mousePressed(resetGraph);
+        $('btn-play').addEventListener('click', () => { togglePlay(); announce(); });
+        $('btn-reset').addEventListener('click', resetGraph);
+        $('btn-mode').addEventListener('click', toggleRadians);
+        $('btn-snap').addEventListener('click', toggleSnap);
+        $('btn-saw').addEventListener('click', toggleSawMode);
+        $('btn-params-reset').addEventListener('click', resetParams);
+
+        for (const k of ['a', 'b', 'c', 'd']) {
+            $('slider-' + k).addEventListener('input', e => {
+                params[k] = parseFloat(e.target.value);
+                updateParamLabels();
+            });
+        }
+        updateParamLabels();
+
+        host.addEventListener('pointerdown', onPointerDown);
+        host.addEventListener('pointermove', onPointerMove);
+        host.addEventListener('pointerup', onPointerUp);
+        host.addEventListener('pointercancel', onPointerUp);
+        window.addEventListener('keydown', onKeyDown);
+
+        new ResizeObserver(fitCanvas).observe(host);
     }
 
-    function windowResized() {
-        const container = select('#canvas-container');
-        resizeCanvas(container.width, container.height);
-        calculateLayout();
+    function fitCanvas() {
+        if (host.clientWidth !== width || host.clientHeight !== height) {
+            resizeCanvas(host.clientWidth, host.clientHeight);
+            calculateLayout();
+        }
     }
+
+    function windowResized() { fitCanvas(); }
 
     function calculateLayout() {
-        circleX = width * 0.20;
-        graphStartX = width * 0.38;
-        graphWidth = width - graphStartX - 40;
-        mainRadius = min(height * 0.32, width * 0.12);
+        L.portrait = width < 640 || height > width * 1.1;
+        if (!L.portrait) {
+            L.unit = min(height * 0.32, width * 0.12);
+            L.circleX = width * 0.20;
+            L.circleY = height / 2;
+            L.graphX = width * 0.38;
+            L.graphW = width - L.graphX - 40;
+            L.graphY = height / 2;
+            L.gUnit = L.unit;
+            L.clip = [L.graphX - 34, 4, L.graphW + 64, height - 8];
+        } else {
+            L.unit = min(width * 0.28, height * 0.17);
+            L.circleX = width / 2;
+            L.circleY = L.unit * 1.5 + 10;
+            const top = L.circleY + L.unit * 1.5;
+            const bottom = height - 30;
+            L.graphX = 34;
+            L.graphW = width - L.graphX - 16;
+            L.graphY = (top + bottom) / 2;
+            L.gUnit = min(L.unit, (bottom - top) / 2 / 1.4);
+            L.clip = [2, L.circleY + L.unit * 1.3, width - 4, height - L.circleY - L.unit * 1.3 - 2];
+        }
     }
+
+    function fontSize() { return constrain(width / 75, 12, 24); }
+
+    // ---------- Mathematik ----------
+
+    function f(x) {
+        return params.a * sin(radians(params.b * (x - params.c))) + params.d;
+    }
+
+    function paramsAreDefault() {
+        return params.a === 1 && params.b === 1 && params.c === 0 && params.d === 0;
+    }
+
+    function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
+
+    function piLabel(deg) {
+        if (deg === 0) return '0';
+        const g = gcd(abs(deg), 180);
+        const n = deg / g, d = 180 / g;
+        const num = abs(n) === 1 ? 'π' : abs(n) + 'π';
+        return (n < 0 ? '−' : '') + num + (d === 1 ? '' : '/' + d);
+    }
+
+    function dec(v, digits) {
+        if (abs(v) < 0.5 * Math.pow(10, -digits)) v = 0;
+        return v.toFixed(digits).replace('.', ',').replace('-', '−');
+    }
+
+    function exactSin(deg) {
+        const r = ((deg % 360) + 360) % 360;
+        let ref = r, sign = 1;
+        if (r > 270) { ref = 360 - r; sign = -1; }
+        else if (r > 180) { ref = r - 180; sign = -1; }
+        else if (r > 90) { ref = 180 - r; }
+        const v = EXACT[ref];
+        if (v === undefined) return null;
+        return (sign < 0 && v !== '0' ? '−' : '') + v;
+    }
+
+    function exactCos(deg) { return exactSin(deg + 90); }
+
+    function nearestSpecial(a) {
+        const c1 = Math.round(a / 30) * 30;
+        const c2 = Math.round(a / 45) * 45;
+        const best = abs(a - c1) <= abs(a - c2) ? c1 : c2;
+        if (abs(a - best) <= SNAP_TOL && best >= ALPHA_MIN && best <= ALPHA_MAX) return best;
+        return null;
+    }
+
+    function alphaText() {
+        const degInt = Math.round(alpha);
+        const isInt = abs(alpha - degInt) < 0.05;
+        if (useRadians) {
+            return isInt ? piLabel(degInt) : '≈ ' + dec(alpha * Math.PI / 180, 2) + ' rad';
+        }
+        return degInt + '°';
+    }
+
+    function pointStrings() {
+        const degInt = Math.round(alpha);
+        const isInt = abs(alpha - degInt) < 0.05;
+        const c = cos(radians(alpha)), s = sin(radians(alpha));
+        const ex = isInt ? exactSin(degInt) : null;
+        const ec = isInt ? exactCos(degInt) : null;
+        return { x: ec || dec(c, 2), y: ex || dec(s, 2), sin: dec(s, 3), exact: ex };
+    }
+
+    // ---------- Bedienung ----------
+
+    function shift() { return sawMode ? -L.unit * 0.2 : 0; }
+
+    function syncPlayBtn() { $('btn-play').textContent = isPlaying ? 'Anhalten' : 'Fortsetzen'; }
 
     function togglePlay() {
         isPlaying = !isPlaying;
         visitedRange.active = true;
-        select('#btn-play').html(isPlaying ? "Anhalten" : "Fortsetzen");
+        syncPlayBtn();
     }
 
     function resetGraph() {
@@ -185,239 +389,405 @@
         visitedRange.max = alpha;
         visitedRange.active = false;
         isPlaying = false;
-        select('#btn-play').html("Fortsetzen");
+        syncPlayBtn();
+    }
+
+    function toggleRadians() {
+        useRadians = !useRadians;
+        $('btn-mode').setAttribute('aria-pressed', String(useRadians));
+        updateParamLabels();
+    }
+
+    function toggleSnap() {
+        snapOn = !snapOn;
+        const btn = $('btn-snap');
+        btn.textContent = snapOn ? 'Einrasten: AN' : 'Einrasten: AUS';
+        btn.setAttribute('aria-pressed', String(snapOn));
     }
 
     function toggleSawMode() {
         sawMode = !sawMode;
-        const btn = select('#btn-saw');
-        btn.html(sawMode ? "Sägeblatt-Modus: AN" : "Sägeblatt-Modus: AUS");
-        if (sawMode) {
-            btn.addClass('saw-active');
-            offsetD = mainRadius * 0.2; 
-        } else {
-            btn.removeClass('saw-active');
-            offsetD = 0;
+        const btn = $('btn-saw');
+        btn.textContent = sawMode ? 'Sägeblatt-Modus: AN' : 'Sägeblatt-Modus: AUS';
+        btn.setAttribute('aria-pressed', String(sawMode));
+        btn.classList.toggle('saw-active', sawMode);
+    }
+
+    function resetParams() {
+        params = { a: 1, b: 1, c: 0, d: 0 };
+        for (const k of ['a', 'b', 'c', 'd']) $('slider-' + k).value = params[k];
+        updateParamLabels();
+    }
+
+    function cLabel(c) { return useRadians ? piLabel(c) : c + '°'; }
+
+    function updateParamLabels() {
+        $('out-a').textContent = dec(params.a, 1).replace(',0', '');
+        $('out-b').textContent = dec(params.b, 1).replace(',0', '');
+        $('out-c').textContent = params.c === 0 ? '0' : cLabel(params.c).replace('-', '−');
+        $('out-d').textContent = dec(params.d, 1).replace(',0', '');
+
+        const num = v => dec(v, 1).replace(',0', '');
+        let arg = params.c === 0
+            ? 'x'
+            : '(x ' + (params.c > 0 ? '− ' : '+ ') + cLabel(abs(params.c)) + ')';
+        if (params.b !== 1) arg = num(params.b) + '·' + arg;
+        let term = 'y = ' + (params.a === 1 ? '' : num(params.a) + '·') + 'sin(' + arg + ')';
+        if (params.d !== 0) term += (params.d > 0 ? ' + ' : ' − ') + num(abs(params.d));
+        $('ui-term').textContent = term;
+    }
+
+    function announce() {
+        clearTimeout(announceTimer);
+        announceTimer = setTimeout(() => {
+            const p = pointStrings();
+            $('sr-status').textContent =
+                'α = ' + alphaText() + ', sin(α) = ' + p.sin + (p.exact ? ' = ' + p.exact : '');
+        }, 400);
+    }
+
+    function nudge(delta) {
+        isPlaying = false;
+        syncPlayBtn();
+        visitedRange.active = true;
+        alpha = constrain(Math.round(alpha) + delta, ALPHA_MIN, ALPHA_MAX);
+        announce();
+    }
+
+    function onKeyDown(e) {
+        const t = document.activeElement;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            nudge((e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 15 : 1));
+            e.preventDefault();
+        } else if (e.code === 'Space') {
+            if (t && t.tagName === 'BUTTON') return;
+            togglePlay();
+            announce();
+            e.preventDefault();
         }
     }
 
-    function mousePressed() {
-        let dShift = -offsetD;
-        let r_curr = mainRadius * amplitude;
-        let px = circleX + cos(radians(alpha)) * r_curr;
-        let py = (height/2 + dShift) - sin(radians(alpha)) * r_curr;
-        
-        // Suche im Graphen (-360 bis 720)
-        let gx = graphStartX + map(alpha, -360, 720, 0, graphWidth);
-        let gy = (height/2 + dShift) - sin(radians(alpha)) * r_curr;
-
-        if (dist(mouseX, mouseY, px, py) < 30) {
-            isDragging = true;
-            dragTarget = 'circle';
-            isPlaying = false;
-            visitedRange.active = true;
-        } else if (dist(mouseX, mouseY, gx, gy) < 30) {
-            isDragging = true;
-            dragTarget = 'graph';
-            isPlaying = false;
-            visitedRange.active = true;
-        }
-        
-        if (!isPlaying) select('#btn-play').html("Fortsetzen");
+    function setPtr(e) {
+        const r = host.getBoundingClientRect();
+        ptr.x = e.clientX - r.left;
+        ptr.y = e.clientY - r.top;
     }
 
-    function mouseReleased() {
+    function graphXOf(a) { return L.graphX + map(a, ALPHA_MIN, ALPHA_MAX, 0, L.graphW); }
+
+    function onPointerDown(e) {
+        if (e.button !== undefined && e.button !== 0) return;
+        setPtr(e);
+        const s = shift();
+        const hit = max(e.pointerType === 'touch' ? 44 : 30, width / 60);
+        const rad = radians(alpha);
+        const px = L.circleX + cos(rad) * L.unit;
+        const py = L.circleY + s - sin(rad) * L.unit;
+        const gx = graphXOf(alpha);
+        const gy = L.graphY + s - f(alpha) * L.gUnit;
+        const dc = dist(ptr.x, ptr.y, px, py);
+        const dg = dist(ptr.x, ptr.y, gx, gy);
+        if (min(dc, dg) < hit) {
+            dragTarget = dc <= dg ? 'circle' : 'graph';
+            isDragging = true;
+            isPlaying = false;
+            visitedRange.active = true;
+            syncPlayBtn();
+            host.setPointerCapture(e.pointerId);
+            e.preventDefault();
+        }
+    }
+
+    function onPointerMove(e) {
+        if (isDragging) setPtr(e);
+    }
+
+    function onPointerUp() {
+        if (isDragging) announce();
         isDragging = false;
         dragTarget = null;
     }
 
+    function dragStep(s) {
+        if (dragTarget === 'circle') {
+            const dx = ptr.x - L.circleX;
+            const dy = ptr.y - (L.circleY + s);
+            const angle = degrees(atan2(-dy, dx));
+            // Wir nehmen den Winkel, der am nächsten am aktuellen alpha liegt.
+            const targetAlpha = angle < 0 ? angle + 360 : angle;
+            let diff = targetAlpha - (alpha % 360);
+            if (diff > 180) diff -= 360;
+            if (diff < -180) diff += 360;
+            alpha = constrain(alpha + diff, ALPHA_MIN, ALPHA_MAX);
+        } else if (dragTarget === 'graph') {
+            const mx = constrain(ptr.x - L.graphX, 0, L.graphW);
+            alpha = map(mx, 0, L.graphW, ALPHA_MIN, ALPHA_MAX);
+        }
+        if (snapOn) {
+            const sn = nearestSpecial(alpha);
+            if (sn !== null) alpha = sn;
+        }
+    }
+
+    // ---------- Zeichnen ----------
+
     function draw() {
         background(255);
-        let dShift = -offsetD;
+        const s = shift();
 
         if (isPlaying) {
-            alpha = (alpha + 1.2);
-            if (alpha > 720) alpha = -360; 
+            alpha += PLAY_STEP;
+            if (alpha > ALPHA_MAX) alpha = ALPHA_MIN;
         }
+        if (isDragging) dragStep(s);
 
-        if (isDragging) {
-            if (dragTarget === 'circle') {
-                let dx = mouseX - circleX;
-                let dy = mouseY - (height/2 + dShift);
-                let angle = degrees(atan2(-dy, dx));
-                // Da wir über 360° hinausgehen können, muss man hier logisch entscheiden.
-                // Wir nehmen den Winkel, der am nächsten am aktuellen alpha liegt.
-                let targetAlpha = angle < 0 ? angle + 360 : angle;
-                // Einfache Heuristik für nahtlosen Übergang beim Ziehen
-                let diff = targetAlpha - (alpha % 360);
-                if (diff > 180) diff -= 360;
-                if (diff < -180) diff += 360;
-                alpha = constrain(alpha + diff, -360, 720);
-            } else if (dragTarget === 'graph') {
-                let mx = constrain(mouseX - graphStartX, 0, graphWidth);
-                alpha = map(mx, 0, graphWidth, -360, 720);
-            }
-        }
-
-        // Tracking der besuchten Winkel
         if (visitedRange.active) {
             visitedRange.min = min(visitedRange.min, alpha);
             visitedRange.max = max(visitedRange.max, alpha);
         }
 
         updateUI();
-        drawScene(dShift);
+        drawScene(s);
     }
 
-    function drawScene(dShift) {
+    function drawScene(s) {
+        const cy = L.circleY + s;
+        const gy = L.graphY + s;
+
         if (sawMode) {
-            fill(161, 98, 7, 30); noStroke();
-            rect(40, height/2 + dShift, width-80, height - (height/2 + dShift) - 10);
+            if (!L.portrait) {
+                fill(161, 98, 7, 30); noStroke();
+                rect(40, cy, width - 80, height - cy - 10);
+            }
             stroke(161, 98, 7); strokeWeight(4);
-            line(30, height/2 + dShift, width-30, height/2 + dShift); 
+            line(30, cy, width - 30, cy);
+            if (L.portrait) line(30, gy, width - 30, gy);
         } else {
-            stroke(220); strokeWeight(1);
-            line(30, height/2 + dShift, width-30, height/2 + dShift);
+            stroke(210); strokeWeight(1);
+            line(30, cy, width - 30, cy);
+            if (L.portrait) line(30, gy, width - 30, gy);
         }
 
-        drawCircleSide(dShift);
-        drawGraphSide(dShift);
+        drawCircleSide(cy);
+        drawGraphSide(s);
     }
 
-    function drawCircleSide(dShift) {
+    function drawSpecialMarks(r, fs) {
+        const cur = ((alpha % 360) + 360) % 360;
+        textSize(fs * 0.75);
+        textAlign(CENTER, CENTER);
+        for (const d of CIRCLE_SPECIALS) {
+            const a = radians(d);
+            const x = cos(a) * r, y = -sin(a) * r;
+            const on = abs(((cur - d + 540) % 360) - 180) < 0.5;
+            noStroke();
+            fill(on ? colPrimary : 130);
+            ellipse(x, y, on ? 10 : 6);
+            if (r >= 100 && d !== 0 && d !== 180 && !on) {
+                fill(90);
+                text(useRadians ? piLabel(d) : d + '°', cos(a) * r * 1.2, -sin(a) * r * 1.2);
+            }
+        }
+    }
+
+    function drawCircleSide(cy) {
+        const r = L.unit;
+        const fs = fontSize();
+        const rad = radians(alpha);
+        const px = cos(rad) * r;
+        const py = -sin(rad) * r;
+
         push();
-        translate(circleX, height/2 + dShift);
-        
-        let rad = radians(alpha);
-        let r_curr = mainRadius * amplitude;
-        let px = cos(rad) * r_curr;
-        let py = -sin(rad) * r_curr;
+        translate(L.circleX, cy);
+        textSize(fs);
 
         if (sawMode) {
             fill(180); stroke(100); strokeWeight(1);
             push();
-            rotate(-rad); 
+            rotate(-rad);
             beginShape();
-            let teeth = 36;
+            const teeth = 36;
             for (let i = 0; i < teeth; i++) {
-                let a = map(i, 0, teeth, 0, TWO_PI);
-                vertex(cos(a) * r_curr, sin(a) * r_curr);
-                let ta = a + (TWO_PI / teeth / 2);
-                vertex(cos(ta) * (r_curr + r_curr * 0.08), sin(ta) * (r_curr + r_curr * 0.02));
+                const a = map(i, 0, teeth, 0, TWO_PI);
+                vertex(cos(a) * r, sin(a) * r);
+                const ta = a + (TWO_PI / teeth / 2);
+                vertex(cos(ta) * (r + r * 0.08), sin(ta) * (r + r * 0.02));
             }
             endShape(CLOSE);
             noFill(); stroke(150);
-            ellipse(0, 0, r_curr * 1.6); ellipse(0, 0, r_curr * 0.8);
+            ellipse(0, 0, r * 1.6); ellipse(0, 0, r * 0.8);
             pop();
-            fill(100); ellipse(0, 0, 15); 
+            fill(100); noStroke(); ellipse(0, 0, 15);
         } else {
-            noFill(); stroke(220);
-            ellipse(0, 0, r_curr * 2);
-            line(-r_curr-20, 0, r_curr+20, 0); line(0, -r_curr-20, 0, r_curr+20);
-            fill(150); noStroke(); textSize(12);
-            text("1", r_curr + 5, 15); text("-1", -r_curr - 18, 15);
+            noFill(); stroke(190); strokeWeight(1);
+            ellipse(0, 0, r * 2);
+            line(-r - 20, 0, r + 20, 0); line(0, -r - 20, 0, r + 20);
+            fill(90); noStroke(); textAlign(CENTER, TOP);
+            text('1', r + 10, 6); text('−1', -r - 12, 6);
+            drawSpecialMarks(r, fs);
         }
 
-        strokeWeight(1); stroke(180);
-        line(0, 0, px, 0); 
+        strokeWeight(1); stroke(150);
+        line(0, 0, px, 0);
         if (!sawMode && abs(px) > 25) {
-            fill(150); noStroke(); textAlign(CENTER); text("cos(α)", px/2, 15);
+            fill(90); noStroke(); textAlign(CENTER, TOP); textSize(fs);
+            text('cos(α)', px / 2, 6);
         }
 
-        stroke(varColor('--accent')); strokeWeight(4);
-        line(px, 0, px, py); 
-        fill(varColor('--accent')); noStroke(); textAlign(LEFT); textStyle(BOLD);
-        if (abs(py) > 15) text(" sin(α)", px + 5, py/2);
+        stroke(colAccent); strokeWeight(4);
+        line(px, 0, px, py);
+        fill(colAccent); noStroke(); textAlign(LEFT, CENTER); textStyle(BOLD); textSize(fs);
+        if (abs(py) > fs * 1.2) text(' sin(α)', px + 5, py / 2);
 
         stroke(0); strokeWeight(1); line(0, 0, px, py);
         fill(0); noStroke(); textStyle(NORMAL); textAlign(CENTER, CENTER);
-        text("1", px/2 - 12, py/2 - 12);
+        text('1', px / 2 - 12, py / 2 - 12);
 
-        noFill(); stroke(varColor('--primary')); strokeWeight(2);
-        arc(0, 0, 50, 50, -rad, 0);
-        fill(varColor('--primary')); noStroke();
-        text("α", 35 * cos(-rad/2), 35 * sin(-rad/2));
+        const arcR = max(22, r * 0.17);
+        noFill(); stroke(colPrimary); strokeWeight(2);
+        arc(0, 0, arcR * 2, arcR * 2, -rad, 0);
+        fill(colPrimary); noStroke();
+        text('α', arcR * 1.4 * cos(-rad / 2), arcR * 1.4 * sin(-rad / 2));
 
         fill(0); stroke(255); strokeWeight(2);
-        ellipse(px, py, 12);
-        noStroke(); fill(0); textStyle(BOLD);
-        text(`P(${ (px/mainRadius).toFixed(2) } | ${ (-py/mainRadius).toFixed(2) })`, px - 35, py - 18);
+        ellipse(px, py, max(12, fs * 0.9));
+        const p = pointStrings();
+        const pLabel = 'P(' + p.x + ' | ' + p.y + ')';
+        textStyle(BOLD);
+        noStroke(); fill(255, 255, 255, 230);
+        rect(px - 35 - textWidth(pLabel) / 2 - 3, py - 22 - fs * 0.7, textWidth(pLabel) + 6, fs * 1.4, 4);
+        fill(0);
+        text(pLabel, px - 35, py - 22);
+        textStyle(NORMAL);
         pop();
     }
 
-    function drawGraphSide(dShift) {
+    function drawGraphSide(s) {
+        const gu = L.gUnit, gw = L.graphW, fs = fontSize();
+        const nonDefault = !paramsAreDefault();
+
+        drawingContext.save();
+        drawingContext.beginPath();
+        drawingContext.rect(L.clip[0], L.clip[1], L.clip[2], L.clip[3]);
+        drawingContext.clip();
+
         push();
-        translate(graphStartX, height/2 + dShift);
-        
+        translate(L.graphX, L.graphY + s);
+        textSize(fs * 0.85);
+
         // Hilfslinien bei 1 und -1
-        stroke(240); strokeWeight(1);
-        line(0, -mainRadius, graphWidth, -mainRadius);
-        line(0, mainRadius, graphWidth, mainRadius);
+        stroke(235); strokeWeight(1);
+        line(0, -gu, gw, -gu);
+        line(0, gu, gw, gu);
+
+        // Mittellinie und Hüllkurven der transformierten Funktion
+        if (nonDefault) {
+            drawingContext.setLineDash([6, 6]);
+            stroke(colPrimary); strokeWeight(1.5);
+            line(0, -params.d * gu, gw, -params.d * gu);
+            drawingContext.setLineDash([2, 6]);
+            stroke(147, 197, 253);
+            line(0, -(params.d + params.a) * gu, gw, -(params.d + params.a) * gu);
+            line(0, -(params.d - params.a) * gu, gw, -(params.d - params.a) * gu);
+            drawingContext.setLineDash([]);
+        }
 
         // Y-Achse
-        stroke(180);
-        line(0, -mainRadius * 1.3, 0, mainRadius * 1.3); 
-        fill(120); noStroke(); textAlign(RIGHT, CENTER); textSize(11);
-        text("1", -8, -mainRadius); text("-1", -8, mainRadius);
+        stroke(150); strokeWeight(1);
+        line(0, -gu * 1.3, 0, gu * 1.3);
+        fill(90); noStroke(); textAlign(RIGHT, CENTER);
+        text('1', -8, -gu); text('−1', -8, gu);
 
         // X-Achse
-        stroke(180);
-        line(0, 0, graphWidth + 10, 0);
-        
-        // Vertikale Gitterlinien und X-Skala
+        stroke(150);
+        line(0, 0, gw + 10, 0);
+
+        // Gitter, Ticks und Skala (alle 30°, beschriftet alle 90° bzw. 180°)
+        const labelStep = gw < 500 ? 180 : 90;
         textAlign(CENTER, TOP);
-        for(let i = -360; i <= 720; i += 90) {
-            let x = map(i, -360, 720, 0, graphWidth);
-            stroke(245); strokeWeight(1);
-            line(x, -mainRadius * 1.2, x, mainRadius * 1.2); // Vertikales Gitter
-            
-            stroke(200);
-            line(x, -5, x, 5); // Ticks
-            
-            noStroke(); fill(120);
-            if (useRadians) {
-                let labels = ["-2π", "-3/2π", "-π", "-π/2", "0", "π/2", "π", "3/2π", "2π", "5/2π", "3π", "7/2π", "4π"];
-                let idx = (i + 360) / 90;
-                text(labels[idx], x, 22);
-            } else {
-                text(i + "°", x, 22);
+        for (let i = ALPHA_MIN; i <= ALPHA_MAX; i += 30) {
+            const x = map(i, ALPHA_MIN, ALPHA_MAX, 0, gw);
+            if (i % 90 === 0) {
+                stroke(240); strokeWeight(1);
+                line(x, -gu * 1.2, x, gu * 1.2);
+            }
+            stroke(170);
+            line(x, -(i % 90 === 0 ? 5 : 3), x, (i % 90 === 0 ? 5 : 3));
+            if (i % labelStep === 0) {
+                stroke(255); strokeWeight(3); fill(90);
+                text(useRadians ? piLabel(i) : i + '°', x, 22 * fs / 14);
+                noStroke();
             }
         }
 
         // Wellenform (nur abgefahrener Bereich)
         if (visitedRange.active) {
-            noFill(); stroke(varColor('--accent')); strokeWeight(3);
-            beginShape();
-            for (let a = visitedRange.min; a <= visitedRange.max; a += 2) {
-                let x = map(a, -360, 720, 0, graphWidth);
-                let y = -sin(radians(a)) * mainRadius * amplitude;
-                vertex(x, y);
+            const a0 = visitedRange.min, a1 = visitedRange.max;
+            if (nonDefault) {
+                noFill(); stroke(160); strokeWeight(1.5);
+                drawingContext.setLineDash([5, 5]);
+                beginShape();
+                for (let a = a0; a < a1; a += 1) vertex(map(a, ALPHA_MIN, ALPHA_MAX, 0, gw), -sin(radians(a)) * gu);
+                vertex(map(a1, ALPHA_MIN, ALPHA_MAX, 0, gw), -sin(radians(a1)) * gu);
+                endShape();
+                drawingContext.setLineDash([]);
             }
+            noFill(); stroke(colAccent); strokeWeight(3);
+            beginShape();
+            for (let a = a0; a < a1; a += 1) vertex(map(a, ALPHA_MIN, ALPHA_MAX, 0, gw), -f(a) * gu);
+            vertex(map(a1, ALPHA_MIN, ALPHA_MAX, 0, gw), -f(a1) * gu);
             endShape();
         }
 
-        // Aktueller Punkt im Graph
-        let gx = map(alpha, -360, 720, 0, graphWidth);
-        let gy = -sin(radians(alpha)) * mainRadius * amplitude;
-        fill(varColor('--accent')); stroke(255); strokeWeight(2);
-        ellipse(gx, gy, 12);
-        
-        // Verbindungslinie
-        stroke(220); strokeWeight(1);
-        drawingContext.setLineDash([5, 5]);
-        let pxLocal = cos(radians(alpha)) * mainRadius * amplitude;
-        line(pxLocal - (graphStartX - circleX), gy, gx, gy);
+        const gx = map(alpha, ALPHA_MIN, ALPHA_MAX, 0, gw);
+        const gy = -f(alpha) * gu;
+        const refY = -sin(radians(alpha)) * gu;
+
+        // Verbindungslinie vom Kreis zum Graphen
+        if (!L.portrait) {
+            stroke(190); strokeWeight(1);
+            drawingContext.setLineDash([5, 5]);
+            const pxLocal = cos(radians(alpha)) * L.unit - (L.graphX - L.circleX);
+            line(pxLocal, refY, gx, refY);
+            drawingContext.setLineDash([]);
+        }
+
+        // Senkrechte zur x-Achse
+        stroke(colAccent); strokeWeight(1);
+        drawingContext.setLineDash([2, 4]);
+        line(gx, 0, gx, gy);
         drawingContext.setLineDash([]);
+
+        if (nonDefault) {
+            fill(160); stroke(255); strokeWeight(2);
+            ellipse(gx, refY, max(9, fs * 0.7));
+        }
+        fill(colAccent); stroke(255); strokeWeight(2);
+        ellipse(gx, gy, max(12, fs * 0.9));
         pop();
+
+        drawingContext.restore();
+    }
+
+    // ---------- Anzeige ----------
+
+    function setText(id, txt) {
+        const node = $(id);
+        if (node.textContent !== txt) node.textContent = txt;
     }
 
     function updateUI() {
-        let s = sin(radians(alpha));
-        let c = cos(radians(alpha));
-        select('#ui-deg').html(floor(alpha));
-        select('#ui-x').html(c.toFixed(2));
-        select('#ui-y').html(s.toFixed(2));
-        select('#ui-sin').html(s.toFixed(3));
+        const p = pointStrings();
+        setText('ui-alpha', alphaText());
+        setText('ui-x', p.x);
+        setText('ui-y', p.y);
+        setText('ui-sin', p.sin);
+        setText('ui-exact', p.exact ? ' = ' + p.exact : '');
+        const fWrap = $('ui-f-wrap');
+        const showF = !paramsAreDefault();
+        if (fWrap.hidden === showF) fWrap.hidden = !showF;
+        if (showF) setText('ui-f', dec(f(alpha), 2));
     }
 
     function varColor(name) {
